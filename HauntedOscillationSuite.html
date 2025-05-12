@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Haunted Oscillation Suite</title>
+	<style>
+		body {
+			background-color: #121212;
+			color: #ffffff;
+			font-family: Arial, sans-serif;
+			margin: 0;
+			padding: 20px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: flex-start;
+			min-height: 100vh;
+		}
+		.container {
+			width: 100%;
+			max-width: 500px;
+			background-color: #1e1e1e;
+			border-radius: 12px;
+			padding: 20px;
+			box-shadow: 0 0 10px rgba(0,0,0,0.5);
+			margin-bottom: 20px;
+		}
+		h2, h3 {
+			text-align: center;
+		}
+		label, button, select {
+			display: block;
+			margin-top: 20px;
+			width: 100%;
+		}
+		input[type="range"] {
+			width: 100%;
+		}
+		button {
+			background-color: #333;
+			color: #fff;
+			border: none;
+			padding: 10px;
+			border-radius: 6px;
+			cursor: pointer;
+		}
+		button:hover {
+			background-color: #444;
+		}
+		select {
+			background-color: #222;
+			color: #fff;
+			border-radius: 6px;
+			padding: 10px;
+			border: none;
+		}
+		.grid {
+			display: grid;
+			grid-template-columns: repeat(8, 1fr);
+			gap: 5px;
+			margin-top: 20px;
+		}
+		.step {
+			width: 100%;
+			aspect-ratio: 1 / 1;
+			background-color: #333;
+			border: 2px solid #555;
+			border-radius: 4px;
+			cursor: pointer;
+		}
+		.step.active {
+			background-color: #00f7ff;
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+
+		<label for="waveform">Waveform Type</label>
+		<select id="waveform">
+			<option value="sine">Sine</option>
+			<option value="square">Square</option>
+			<option value="triangle">Triangle</option>
+			<option value="sawtooth">Sawtooth</option>
+		</select>
+
+		<label for="frequency">Frequency (Hz): <span id="freqValue">440</span></label>
+		<input type="range" id="frequency" min="20" max="2000" value="440">
+
+		<label for="volume">Volume: <span id="volValue">0.5</span></label>
+		<input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
+
+		<label for="detune">Detune (cents): <span id="detuneValue">0</span></label>
+		<input type="range" id="detune" min="-1200" max="1200" value="0">
+
+		<label for="reverb">Reverb (experimental):</label>
+		<input type="checkbox" id="reverb">
+
+		<button id="start">Start</button>
+		<button id="stop">Stop</button>
+
+		<h3>Step Sequencer</h3>
+		<div id="sequencer" class="grid"></div>
+	</div>
+
+	<script>
+		const AudioContext = window.AudioContext || window.webkitAudioContext;
+		let audioCtx;
+		let oscillator;
+		let gainNode;
+		let convolver;
+		let isPlaying = false;
+		let stepInterval;
+		let currentStep = 0;
+		const steps = Array(8).fill(false);
+
+		const freqSlider = document.getElementById('frequency');
+		const volSlider = document.getElementById('volume');
+		const detuneSlider = document.getElementById('detune');
+		const freqValue = document.getElementById('freqValue');
+		const volValue = document.getElementById('volValue');
+		const detuneValue = document.getElementById('detuneValue');
+		const waveformSelect = document.getElementById('waveform');
+		const reverbToggle = document.getElementById('reverb');
+		const sequencerEl = document.getElementById('sequencer');
+
+		function createReverb(audioCtx) {
+			const convolver = audioCtx.createConvolver();
+			const length = audioCtx.sampleRate * 3;
+			const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
+			for (let i = 0; i < 2; i++) {
+				const channel = impulse.getChannelData(i);
+				for (let j = 0; j < length; j++) {
+					channel[j] = (Math.random() * 2 - 1) * (1 - j / length);
+				}
+			}
+			convolver.buffer = impulse;
+			return convolver;
+		}
+
+		function triggerStepSynth() {
+			if (steps[currentStep]) {
+				const osc = audioCtx.createOscillator();
+				const gain = audioCtx.createGain();
+				osc.type = waveformSelect.value;
+				osc.frequency.setValueAtTime(freqSlider.value, audioCtx.currentTime);
+				osc.detune.setValueAtTime(detuneSlider.value, audioCtx.currentTime);
+				gain.gain.setValueAtTime(volSlider.value, audioCtx.currentTime);
+
+				let finalNode = gain;
+				if (reverbToggle.checked) {
+					const stepConvolver = createReverb(audioCtx);
+					gain.connect(stepConvolver);
+					stepConvolver.connect(audioCtx.destination);
+				} else {
+					gain.connect(audioCtx.destination);
+				}
+
+				osc.connect(gain);
+				osc.start();
+				osc.stop(audioCtx.currentTime + 0.3);
+			}
+			const stepEls = document.querySelectorAll('.step');
+			stepEls.forEach((el, i) => {
+				el.classList.toggle('active', i === currentStep);
+			});
+			currentStep = (currentStep + 1) % 8;
+		}
+
+		function setupSequencer() {
+			for (let i = 0; i < 8; i++) {
+				const step = document.createElement('div');
+				step.className = 'step';
+				step.addEventListener('click', () => {
+					steps[i] = !steps[i];
+					step.style.backgroundColor = steps[i] ? '#00f7ff' : '#333';
+				});
+				sequencerEl.appendChild(step);
+			}
+		}
+
+		setupSequencer();
+
+		freqSlider.addEventListener('input', () => {
+			freqValue.textContent = freqSlider.value;
+			if (oscillator) oscillator.frequency.setValueAtTime(freqSlider.value, audioCtx.currentTime);
+		});
+
+		volSlider.addEventListener('input', () => {
+			volValue.textContent = volSlider.value;
+			if (gainNode) gainNode.gain.setValueAtTime(volSlider.value, audioCtx.currentTime);
+		});
+
+		detuneSlider.addEventListener('input', () => {
+			detuneValue.textContent = detuneSlider.value;
+			if (oscillator) oscillator.detune.setValueAtTime(detuneSlider.value, audioCtx.currentTime);
+		});
+
+		document.getElementById('start').addEventListener('click', () => {
+			if (!isPlaying) {
+				audioCtx = new AudioContext();
+				oscillator = audioCtx.createOscillator();
+				gainNode = audioCtx.createGain();
+
+				oscillator.type = waveformSelect.value;
+				oscillator.frequency.setValueAtTime(freqSlider.value, audioCtx.currentTime);
+				oscillator.detune.setValueAtTime(detuneSlider.value, audioCtx.currentTime);
+				gainNode.gain.setValueAtTime(volSlider.value, audioCtx.currentTime);
+
+				let finalNode = gainNode;
+				if (reverbToggle.checked) {
+					convolver = createReverb(audioCtx);
+					gainNode.connect(convolver);
+					convolver.connect(audioCtx.destination);
+				} else {
+					gainNode.connect(audioCtx.destination);
+				}
+
+				oscillator.connect(gainNode);
+				oscillator.start();
+				isPlaying = true;
+
+				stepInterval = setInterval(triggerStepSynth, 500);
+			}
+		});
+
+		document.getElementById('stop').addEventListener('click', () => {
+			if (isPlaying) {
+				oscillator.stop();
+				audioCtx.close();
+				isPlaying = false;
+				clearInterval(stepInterval);
+				currentStep = 0;
+			}
+		});
+	</script>
+<footer>
+	<br><br><br><p><p style="text-align: center;">A tool by a tool: <a href="https://github.com/caskexe/">CASK.exe</a></p> </p>
+</footer>
+</body>
+</html>

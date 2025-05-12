@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Haunted Oscillation Suite</title>
+</head>
+			<style>
+			</style>
+<body>
+	<div class="container">
+
+		<label for="waveform">Waveform Type</label>
+		<select id="waveform">
+			<option value="sine">Sine</option>
+			<option value="square">Square</option>
+			<option value="triangle">Triangle</option>
+			<option value="sawtooth">Sawtooth</option>
+		</select>
+
+		<label for="frequency">Frequency (Hz): <span id="freqValue">440</span></label>
+		<input type="range" id="frequency" min="20" max="2000" value="440">
+
+		<label for="volume">Volume: <span id="volValue">0.5</span></label>
+		<input type="range" id="volume" min="0" max="1" step="0.01" value="0.5">
+
+		<label for="detune">Detune (cents): <span id="detuneValue">0</span></label>
+		<input type="range" id="detune" min="-1200" max="1200" value="0">
+
+		<label for="reverb">Reverb (experimental):</label>
+		<input type="checkbox" id="reverb">
+
+		<button id="start">Start</button>
+		<button id="stop">Stop</button>
+
+		<h3>Step Sequencer</h3>
+		<div id="sequencer" class="grid"></div>
+	</div>
+
+						<script>
+						</script>
+<footer>
+	<br><br><br><p><p style="text-align: center;">A tool by a tool: <a href="https://github.com/caskexe/">CASK.exe</a></p> </p>
+</footer>
+</body>
+</html>
